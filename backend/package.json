@@ -1,0 +1,23 @@
+{
+  "name": "lld-practice-platform-backend",
+  "version": "1.0.0",
+  "description": "Backend foundation for LLD Practice Platform",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "seed": "node seed/seedProblems.js",
+    "test": "node test/test_backend.js && node test/test_ai_evaluator.js && node test/test_ai_service_integration.js",
+    "test:ai": "node test/test_ai_evaluator.js && node test/test_ai_service_integration.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.1.3"
+  }
+}
