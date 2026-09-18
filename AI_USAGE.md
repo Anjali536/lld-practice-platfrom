@@ -1,95 +1,127 @@
-# AI Architectural Decisions & Usage Log
+# AI Usage
 
-This document records the key architectural decisions shaped during the design and implementation of the LLD Practice Platform, specifically regarding automated reasoning, evaluation strategies, and system resilience.
+## Overview
 
----
+AI tools were used during the development of this project primarily as a development assistant for brainstorming, clarification, and reviewing implementation approaches.
 
-### Decision 1 — Structured, Evidence-Backed Evaluation Schema
+The implementation, project structure, technology choices, and final decisions were reviewed and integrated manually.
 
-- **What AI Suggested:**
-  Instead of asking the LLM or evaluator to output a single holistic score (e.g. "82/100") or a free-form essay, enforce a fixed JSON schema structured around 6 core Low-Level Design dimensions:
-  1. *Requirement Understanding*
-  2. *Responsibilities*
-  3. *Encapsulation & Abstraction*
-  4. *Coupling & Cohesion*
-  5. *Extensibility*
-  6. *Testability*
-  Each criterion must independently return a score (1–5), evidence from the learner's text, an architectural concern, a concrete suggestion, and a confidence rating (0.0–1.0).
+AI was used to provide suggestions rather than to independently design or implement the complete application.
 
-- **What Was Accepted:**
-  Adopted the exact 6-criteria JSON schema across both `RuleEvaluator` and `AIEvaluator`.
+## How AI Was Used
 
-- **Why:**
-  In Low-Level Design, arbitrary scores without evidence frustrate learners and lack educational value. Structured outputs guarantee explainable feedback, enable radar/breakdown visual representations in the UI, and allow direct comparisons across repeated attempts.
+### 1. Architecture and Project Structure
 
----
+AI was used to discuss and validate possible approaches for structuring the application.
 
-### Decision 2 — Extensible Evaluation via the Strategy Pattern
+For example, AI helped suggest a simple modular monolith structure with:
 
-- **What AI Suggested:**
-  Decouple the submission pipeline from the evaluation engine using the classic Gang of Four **Strategy Pattern**. `EvaluationService` should programmatically depend on an abstract `EvaluationStrategy` base class rather than binding directly to a rule engine or an external AI API.
+* React + Vite frontend
+* Node.js + Express backend
+* MongoDB with Mongoose
+* Controllers
+* Services
+* Repositories
+* Evaluator/strategy layer
 
-- **What Was Accepted:**
-  Created `EvaluationStrategy` with `evaluate(submission, problem)` as a contract, and implemented both `RuleEvaluator` and `AIEvaluator` as pluggable strategies selected via `EVALUATION_MODE`.
+The final architecture was selected based on the assignment requirements and the need to keep the MVP simple.
 
-- **Why:**
-  This fulfills the open/closed principle: new evaluation engines (e.g., fine-tuned models, human peer review, static code analyzers) can be introduced without touching the `SubmissionService`, database repositories, or React frontend routes.
+### 2. UI/UX Suggestions
 
----
+AI was used to suggest improvements to:
 
-### Decision 3 — Coexistence of Deterministic Rules and LLM Reasoning
+* information hierarchy
+* typography
+* spacing
+* problem specification presentation
+* practice workspace organization
+* readability of feedback
 
-- **What AI Suggested:**
-  Do not discard rule-based evaluation when introducing AI. Maintain a deterministic baseline engine that can run fully offline with zero external credentials or network dependencies, and layer the LLM evaluator as an opt-in reasoning engine.
+These were suggestions only. The final UI direction and changes were reviewed and applied to the project based on the intended learner experience.
 
-- **What Was Accepted:**
-  Preserved `RuleEvaluator` as the default mode (`EVALUATION_MODE=rule`) and created `AIEvaluator` for `EVALUATION_MODE=ai`.
+### 3. LLD Evaluation Approach
 
-- **Why:**
-  Rule-based heuristics provide instantaneous, zero-cost, deterministic feedback suitable for CI/CD pipelines and local test suites. The LLM engine provides nuanced semantic reasoning capable of interpreting unconventional class names, design metaphors, and trade-off rationales. Neither replaces the other; both are valuable.
+AI was used to discuss how an LLD submission could be evaluated without assuming that there is only one correct design.
 
----
+This led to the use of criteria such as:
 
-### Decision 4 — Strict Pre-Persistence Validation of AI Responses
+* Requirement Understanding
+* Responsibilities
+* Encapsulation & Abstraction
+* Coupling / Cohesion
+* Extensibility
+* Testability
 
-- **What AI Suggested:**
-  Treat LLM outputs as untrusted third-party inputs. Implement strict schema and semantic validation before committing any evaluation payload to MongoDB.
+The current MVP uses a deterministic rule-based evaluator. This keeps evaluation predictable and explainable.
 
-- **What Was Accepted:**
-  Implemented `AIEvaluator.validateResponse()` which validates:
-  - Exact criteria count (precisely 6 items).
-  - Exact criterion naming matching the rubric.
-  - Integer score constraints ($1 \le \text{score} \le 5$).
-  - Confidence constraints ($0.0 \le \text{confidence} \le 1.0$).
-  - Non-empty evidence, concern, and suggestion string attributes.
-  - Overall summary, strengths, and improvements presence.
+### 4. Debugging and Development Guidance
 
-- **Why:**
-  LLMs can occasionally hallucinate extra criteria, omit keys, or return float/out-of-bounds scores. Failing early and explicitly preserves database integrity and prevents UI crashes on the feedback screen.
+AI was also used during development for:
 
----
+* understanding error messages
+* identifying possible implementation issues
+* suggesting debugging approaches
+* reviewing API flow
+* validating frontend/backend integration
+* suggesting test cases
 
-### Decision 5 — Transparent Failure Behavior Without Silent Degradation
+The suggestions were reviewed before being applied.
 
-- **What AI Suggested:**
-  When `EVALUATION_MODE=ai` is enabled and the LLM provider fails (due to rate limits, invalid API keys, timeout, or malformed JSON), do **not** silently fall back to `RuleEvaluator` and pretend the AI succeeded.
+## AI-Assisted Evaluation
 
-- **What Was Accepted:**
-  Persist the learner's `Submission` first, transition the `Attempt` to `EVALUATING`, and if the AI call fails, explicitly mark both `Evaluation` and `Attempt` as `FAILED`.
+The project architecture allows an AI-based evaluator to be introduced through the evaluator strategy abstraction.
 
-- **Why:**
-  Silent fallback masks API outages, creates confusing debugging scenarios, and misleads learners about whether their design received AI reasoning or keyword matching. Saving the submission prior to evaluation ensures zero work is lost, allowing the learner to retry whenever the provider recovers.
+However, the MVP currently uses the deterministic rule-based evaluator as the default evaluation mechanism.
 
----
+This was an intentional decision because it provides:
 
-### Decision 6 — Explicit Instructions Acknowledging Multiple Valid Designs
+* predictable results
+* explainable feedback
+* easier testing
+* no dependency on an external LLM provider
+* no requirement for an API key during normal project execution
 
-- **What AI Suggested:**
-  Include explicit negative constraints in the evaluation system prompt instructing the model that Low-Level Design does not have a single "canonical" solution.
+An AI evaluator can be added later without replacing the existing evaluator interface.
 
-- **What Was Accepted:**
-  Injected prompt instructions stating:
-  > *"There may be multiple valid LLD designs for the same problem. Do not compare the learner's design against one fixed reference implementation. Evaluate whether the submitted design satisfies the requirements and whether its abstractions, responsibilities, relationships, and trade-offs are reasonable. Do not penalize a learner merely because they chose a different valid design."*
+## What AI Did Not Decide
 
-- **Why:**
-  Prevents models from biasing toward textbook patterns (e.g., demanding a Singleton for `ParkingLot` when a dependency-injected controller is equally or more valid).
+AI was not treated as the source of truth for the project.
+
+The following decisions were made based on the assignment requirements and project constraints:
+
+* MVP scope
+* selected technologies
+* backend architecture
+* API structure
+* database models
+* submission flow
+* evaluation criteria
+* persistence approach
+* frontend routes
+* final UI decisions
+* testing and verification
+
+## Limitations
+
+The current implementation intentionally keeps the scope small.
+
+Current limitations include:
+
+* The MVP contains a small set of LLD problems.
+* Evaluation is rule-based rather than fully semantic.
+* Multiple valid LLD designs cannot always be judged with complete contextual understanding by deterministic rules.
+* Authentication and multi-user functionality are outside the MVP scope.
+* The application is designed as a simple monolith rather than a distributed system.
+* Advanced diagram editing is not part of the current MVP.
+
+## Future AI Usage
+
+If an AI evaluator is enabled in a future version, it can be used for aspects that require more contextual reasoning, such as:
+
+* understanding design intent
+* evaluating alternative valid designs
+* identifying architectural trade-offs
+* generating more personalized feedback
+* explaining design improvements
+
+The deterministic evaluator can continue handling objective checks while AI handles areas where contextual reasoning is more useful.
